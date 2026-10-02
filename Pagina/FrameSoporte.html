@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soporte Técnico - Plataforma Inteligente</title>
+    <link rel="stylesheet" href="Disenio.css">   
+</head>
+<body>
+
+    <div class="main-layout">
+        <!-- Barra Lateral de Navegación -->
+        <aside class="sidebar">
+    <div class="sidebar-top">
+        <nav class="nav-menu">
+
+            <a href="#" class="nav-link">
+                <img src="Iconos/Home.png" alt="Inicio" class="custom-icon">
+                Inicio
+            </a>
+
+            <a href="#" class="nav-link active">
+                <img src="Iconos/soporte.png" alt="Soporte" class="custom-icon">
+                Soporte
+            </a>
+
+            <a href="#" class="nav-link">
+                <img src="Iconos/barras.png" alt="Dashboard" class="custom-icon">
+                Dashboard
+            </a>
+
+            <a href="#" class="nav-link">
+                <img src="Iconos/ajustes.png" alt="Ajustes" class="custom-icon">
+                Ajustes
+            </a>
+
+        </nav>
+    </div>
+
+    <div class="sidebar-footer">
+        <div class="user-profile">
+            <img src="icon/Usuario.png" alt="Usuario" class="user-avatar-icon">
+            <span class="user-name">Usuario</span>
+        </div>
+    </div>
+</aside>
+
+        <!-- Contenido Principal -->
+        <main class="content">
+            <header class="content-header">
+                <h1>¿Tienes Problemas con tu dispos?</h1>
+            </header>
+
+            <!-- Contenedor del Formulario -->
+            <div class="form-card-wrapper">
+                <div class="form-card">
+                    <form id="soporte-form">
+                        <!-- Campos de texto -->
+                        <div class="form-group">
+                            <label for="nombre">Nombre completo:</label>
+                            <input type="text" id="nombre" name="nombre">
+                        </div>
+                        <div class="form-group">
+                            <label for="identificacion">Identificación:</label>
+                            <input type="text" id="identificacion" name="identificacion">
+                        </div>
+                        <div class="form-group">
+                            <label for="correo">Correo electrónico:</label>
+                            <input type="email" id="correo" name="correo">
+                        </div>
+                        <div class="form-group">
+                            <label for="telefono">Telefono:</label>
+                            <input type="tel" id="telefono" name="telefono">
+                        </div>
+                        <div class="form-group">
+                            <label for="tipo_dispositivo">Tipo de dispositivo:</label>
+                            <input type="text" id="tipo_dispositivo" name="tipo_dispositivo">
+                        </div>
+
+                        <!-- Área de texto grande -->
+                        <div class="form-group full-width">
+                            <label for="descripcion">Descripcion libre del problema:</label>
+                            <textarea id="descripcion" name="descripcion" rows="6"></textarea>
+                        </div>
+
+                        <!-- Botones de acción -->
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary">Subir archivos</button>
+                            <a href="#" class="privacy-link">Políticas de privacidad</a>
+                            <button type="submit" class="btn-primary">Enviar reporte</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+<script src="app.js"></script>
+</body>
+</html>
