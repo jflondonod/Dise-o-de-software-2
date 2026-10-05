@@ -1,0 +1,258 @@
+/*Variables de Color y Estilo Global*/
+:root {
+    --bg-color: #CCC7C7; /* Fondo negro oscuro */
+    --sidebar-bg: #C0C0C0; /* Fondo de la barra lateral */
+    --card-bg: #2a2a2a; /* Fondo gris oscuro de la tarjeta del formulario */
+    --text-color-light: #ffffff;
+    --text-color-dark: #000000;
+    --active-link-bg: #000000; /* Fondo negro para el enlace activo */
+    --border-color: rgba(255, 255, 255, 0.4);
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color-dark);
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+         
+.main-layout {
+    display: flex;
+    width: 95vw;
+    height: 95vh;
+    background: radial-gradient(circle at top right, #333333, var(--bg-color) 60%); /* Degradado sutil de fondo */
+    border-radius: 30px;
+    overflow: hidden;
+}
+
+/*Barra Lateral*/
+.sidebar {
+    width: 260px;
+    background-color: var(--sidebar-bg);
+    color: var(--text-color-dark);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 40px 20px;
+    border-top-left-radius: 30px;
+    border-bottom-left-radius: 30px;
+}
+
+.nav-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 20px;
+    border-radius: 40px; /* Esquinas redondeadas de los elementos del menú */
+    text-decoration: none;
+    color: var(--text-color-dark);
+    font-weight: 500;
+    transition: background-color 0.3s, color 0.3s; /* Transición suave para el cambio de color */
+}
+
+.nav-link:hover {
+    background-color: rgba(0, 0, 0, 0.1); /* Efecto hover sutil */
+}
+
+.nav-link.active {
+    background-color: var(--active-link-bg);
+    color: var(--text-color-light);
+}
+
+.sidebar-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centra el perfil en la barra lateral */
+    gap: 20px;
+    padding-top: 20px;
+    padding-bottom: 10px;
+}
+
+.user-profile {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Icono arriba y texto abajo centrados */
+    gap: 8px;
+}
+
+/* Círculo negro exclusivo de la barra lateral */
+.sidebar .user-avatar-container {
+    width: 100px;
+    height: 100px;
+    background-color: #000000;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Icono blanco dentro del círculo */
+.sidebar .user-avatar-icon {
+    width: 70px;
+    height: 70px;
+    filter: brightness(0) invert(1);
+}
+
+.sidebar .user-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-color-dark);
+}
+
+/* Contenido Principal */
+.content {
+    flex: 1;
+    padding: 50px 80px;
+    display: flex;
+    flex-direction: column;
+}
+
+.content-header h1 {
+    margin: 0 0 20px 0;
+    font-size: 28px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9); 
+}
+
+.form-card-wrapper {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* La tarjeta del formulario central */
+.form-card {
+    width: 100%;
+    max-width: 450px;
+    min-height: 80px;
+    padding: 35px;
+    border-radius: 30px;
+    box-shadow: var(--shadow);
+    
+    /* Estilos de Glassmorphism */
+    background: rgba(221, 201, 201, 0.08);
+    border: 2px solid rgba(228, 219, 219, 0.3);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+#soporte-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="tel"] {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color-light);
+    padding: 6px 0;
+    font-size: 13px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+input:focus, textarea:focus {
+    border-bottom-color: var(--text-color-light);
+}
+
+/* Área de texto corregida con padding para que no esté pegada a la orilla */
+textarea {
+    background: transparent;
+    color: var(--text-color-light);
+    resize: none;
+    border: 1px solid var(--border-color);
+    border-radius: 15px;
+    padding: 10px 14px;
+    height: 75px; /* Altura correcta asignada */
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+}
+
+/* --- Botones y Enlaces Inferiores --- */
+.form-actions {
+    display: flex;
+    justify-content: space-between; /* Distribuye equitativamente los elementos */
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.btn-primary, .btn-secondary {
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s;
+    text-decoration: none;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.btn-primary:active, .btn-secondary:active {
+    transform: scale(0.98);
+}
+
+.btn-primary {
+    background-color: #d9d9d9;
+    color: var(--text-color-dark);
+}
+
+.btn-primary:hover {
+    background-color: #bfbfbf;
+}
+
+.btn-secondary {
+    background-color: #000000;
+    color: var(--text-color-light);
+}
+
+.btn-secondary:hover {
+    background-color: #333333;
+}
+
+.privacy-link {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: underline;
+    text-align: center;
+    max-width: 90px;
+    line-height: 1.2;
+}
