@@ -1,0 +1,494 @@
+{
+  "name": "Soporte tecnico - diseniodesofware",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "13a4622e-0c53-424a-9121-f5f9907c604f",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -128,
+        -16
+      ],
+      "id": "30879aff-2426-476d-9b4c-74ba25373e43",
+      "name": "Webhook",
+      "webhookId": "13a4622e-0c53-424a-9121-f5f9907c604f"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tickets_soporte (\n    nombre_completo, \n    identificacion, \n    correo_electronico, \n    telefono, \n    tipo_dispositivo, \n    descripcion_problema, \n    estado\n) \nVALUES (\n    '{{ $('Webhook').item.json.body.nombre }}', \n    '{{ $('Webhook').item.json.body.identificacion }}', \n    '{{ $('Webhook').item.json.body.correo }}', \n    '{{ $('Webhook').item.json.body.telefono }}', \n    '{{ $('Webhook').item.json.body.tipo_dispositivo }}', \n    '{{ $('Webhook').item.json.body.descripcion }}', \n    'Pendiente'\n)\nRETURNING id, fecha_creacion;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        96,
+        -16
+      ],
+      "id": "6531633d-a893-42f4-a870-402e196f9eee",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "iD6PXBV4TH9sFG9H",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3-flash-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Actúa como un especialista de soporte técnico de nivel 1. Analiza el siguiente problema reportado por el cliente y proporciónale exactamente 3 pasos de solución remota que pueda intentar:\n{{ $('Webhook').item.json.body.descripcion }}"
+            },
+            {}
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -160,
+        240
+      ],
+      "id": "1f6bc17f-c8d3-40b4-b09b-aec36e4b6055",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Fzq5nEtwiBJnHwt4",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "= {{ $('Webhook').item.json.body.correo }}",
+        "subject": "Nuevo mensaje de contacto",
+        "message": "=<p>Hola <strong>{{ $('Webhook').item.json.body.nombre }}</strong>,</p> <p>Hemos recibido exitosamente tu solicitud de soporte técnico. Aquí están los detalles registrados:</p> <ul>     <li><strong>Tipo de Dispositivo:</strong> {{ $('Webhook').item.json.body.tipo_dispositivo }}</li>     <li><strong>Descripción del problema:</strong> {{ $('Webhook').item.json.body.descripcion }}</li> </ul> <p>Nos pondremos en contacto contigo muy pronto a través de este correo o al teléfono <strong>{{ $('Webhook').item.json.body.telefono }}</strong>.</p> <br> <p>Atentamente,<br>Tu Equipo de Soporte.</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -16
+      ],
+      "id": "3e59c952-f34a-458f-a43c-71d71f6ca30a",
+      "name": "Send a message",
+      "webhookId": "c0c5a5cd-07ec-4542-a909-565544be07f6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4sGooR9hKOGlsqhZ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        432,
+        240
+      ],
+      "id": "e9a06148-f905-4ba7-8a70-fee94e918724",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst aiText = $input.first().json.content.parts[0].text;\n\n\nconst ticketId = $('Execute a SQL query').first().json.id;\n\nreturn [{\n  json: {\n    status: \"success\",\n    ticket_id: ticketId,\n    response: aiText\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        240
+      ],
+      "id": "d3baf4c1-97b7-4058-8663-171756cd5e45",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3-flash-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Tipo de dispositivo: {{ $json.tipo_dispositivo }}\nProblema inicial reportado: {{ $json.descripcion_problema }}\nDetalles del dispositivo (Datos JSON): {{ JSON.stringify($json) }}\nMensaje actual del usuario: {{ $json.mensaje }}\nIntento actual: {{ $json.intento_actual || 2 }} de 3.\n\nInstrucción estricta: No vuelvas a pedir la descripción del problema ni el tipo de dispositivo. Ya los tienes en el contexto anterior. Da directamente la siguiente alternativa técnica de solución adaptada específicamente al dispositivo indicado."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        384,
+        832
+      ],
+      "id": "0f9af06d-a117-4962-9149-652a0317b0ea",
+      "name": "Message a model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Fzq5nEtwiBJnHwt4",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6a1d12a9-c35b-428b-babc-941b904c4b7d",
+              "leftValue": "={{ $json.body.intentar }}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -128,
+        784
+      ],
+      "id": "bfaddf4e-659c-4fff-9b7a-fe3185ada6d0",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "julianlondoo14@gmail.com",
+        "subject": "=⚠️ URGENTE: Ticket #{{ $json.ticket_id }} Escalado a Soporte Humano",
+        "message": "=Hola equipo de soporte,  El sistema de atención automática ha determinado que un usuario ha agotado los 3 intentos de solución automática sin éxito. El caso requiere intervención humana prioritaria.  Detalles del caso: - ID del Ticket: {{ $json.ticket_id }} - Estado actual: Escalado a Humano - Último intento registrado: 3  Por favor, revisar el historial de chat en la base de datos para ver el contexto completo y ponerse en contacto con el usuario.  Atentamente, Sistema Automatizado de Soporte - Diseño de Software",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        1072
+      ],
+      "id": "878fff86-3cdb-4ce2-a62c-46e5d3a3b195",
+      "name": "Send a message1",
+      "webhookId": "bfef3a08-9070-4687-a1db-2518aa5165fd",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4sGooR9hKOGlsqhZ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO historial_chat (ticket_id, emisor, mensaje, intento_actual)\nVALUES ($1, $2, $3, $4)\nRETURNING *;\n\n",
+        "options": {
+          "queryReplacement": "=={{ [ $json.body.ticket_id, 'usuario', $json.body.message, $json.body.attempt ] }}\n{{ $json.body.attempt }}\n"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        80,
+        816
+      ],
+      "id": "4db50322-9d0f-4b9d-ac49-513546b431e4",
+      "name": "Registrar historial",
+      "credentials": {
+        "postgres": {
+          "id": "iD6PXBV4TH9sFG9H",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "5f2be296-d650-45a1-ba7f-f8832c1156e4",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -352,
+        736
+      ],
+      "id": "37c1540a-5e6b-44c0-887f-ccdc5b8eeb00",
+      "name": "Webhook1",
+      "webhookId": "5f2be296-d650-45a1-ba7f-f8832c1156e4"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"response\": {{ JSON.stringify($json.content.parts[0].text) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        848
+      ],
+      "id": "abc88b34-89d7-4d34-8de8-ecd321997758",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\": \"resolved\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        96,
+        608
+      ],
+      "id": "c855ad22-3e80-4d2d-91b8-7349e76626e5",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT descripcion_problema, tipo_dispositivo\nFROM tickets_soporte \nWHERE id = $1;\n",
+        "options": {
+          "queryReplacement": "={{ $json.ticket_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        240,
+        816
+      ],
+      "id": "6df7b7d0-1ba4-4fa2-b834-3cb070165a7a",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "iD6PXBV4TH9sFG9H",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.tickets_soporte \nSET estado = 'Escalado a Humano' \nWHERE id = $1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        112,
+        1072
+      ],
+      "id": "84b0c26f-0474-4ec3-8c94-8a0a28cf72c4",
+      "name": "Execute a SQL query2",
+      "credentials": {
+        "postgres": {
+          "id": "iD6PXBV4TH9sFG9H",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar historial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar historial": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook2": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "America/Bogota",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "ce6ffc4a-ef3b-45ea-a7d5-6912946fe7cb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3b56989ef9295ee9c9351082700011d49d26f4d4d43255d7aaadc82d271ad0bd"
+  },
+  "nodeGroups": [],
+  "id": "S8JrJIqHD9cojVAN",
+  "tags": []
+}
