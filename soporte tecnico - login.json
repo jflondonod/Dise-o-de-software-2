@@ -1,0 +1,479 @@
+{
+  "name": "soporte tecnico - login",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "e7762214-306c-4532-8bd0-c89198155be4",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -160,
+        -32
+      ],
+      "id": "0dc547c5-2dce-4584-ac64-da56d8d78c5b",
+      "name": "Receptor pagina",
+      "webhookId": "e7762214-306c-4532-8bd0-c89198155be4"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "register",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "97ef82fb-69a1-48ca-8fb8-f8dc30a6d6f4"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "6399b594-4f3c-4c49-a15f-5ae1fc07b3e2",
+                    "leftValue": "={{ $json.body.action}}",
+                    "rightValue": "login",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "5fbbe72d-3133-4326-a8bc-2590a3454bf4",
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "forgot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        96,
+        -32
+      ],
+      "id": "26db04d6-fdbc-4698-b3ce-683fdd67e873",
+      "name": "Selector de accion (registo/Login/olvidecontrasenia"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\n// Recorremos los datos que vienen del Webhook\nreturn $input.all().map(item => {\n    // Obtenemos el cuerpo de la petición (body)\n    const body = item.json.body || item.json;\n    \n    if (body.password) {\n        // Generamos un 'salt' aleatorio de 16 bytes\n        const salt = crypto.randomBytes(16).toString('hex');\n        \n        // Creamos un hash seguro usando scryptSync nativo de Node.js\n        const hash = crypto.scryptSync(body.password, salt, 64).toString('hex');\n        \n        // Guardamos el resultado combinado (salt + hash) en una variable limpia\n        item.json.passwordHash = `${salt}:${hash}`;\n    }\n    \n    return item;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        -288
+      ],
+      "id": "fe79467d-41c2-4a7f-a0f4-83a858622941",
+      "name": "Encriptar contraseña"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO usuarios (nombre_completo, cedula, correo, telefono, password_hash)\nVALUES ($1, $2, $3, $4, $5)\nRETURNING id, nombre_completo, correo, rol, creado_en;",
+        "options": {
+          "queryReplacement": "={{ $json.body.name}}\n{{ $json.body.cedula}}\n{{ $json.body.email}}\n{{ $json.body.phone}}\n{{ $json.passwordHash}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        656,
+        -288
+      ],
+      "id": "1f3e8ac4-8a10-4aff-96ad-c4648c203b63",
+      "name": "Registrar usuario",
+      "credentials": {
+        "postgres": {
+          "id": "iD6PXBV4TH9sFG9H",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": true,\n  \"message\" : \"Usuario registrado exitosamente\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        976,
+        -336
+      ],
+      "id": "60aab9b3-d53d-443d-b60f-13d5aa027915",
+      "name": "Respuesta registro exitoso"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"El correo o la cédula ya se encuentran registrados en el sistema.\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        976,
+        -176
+      ],
+      "id": "9eb24e3f-9039-4431-b121-d334d897fed6",
+      "name": "Respuesta error"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, nombre_completo, correo, password_hash, rol, estado \nFROM usuarios \nWHERE correo = $1;",
+        "options": {
+          "queryReplacement": "={{ $json.body.email}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        400,
+        -32
+      ],
+      "id": "7aa3fdf8-c5ae-4565-a7de-eaf8e2a44925",
+      "name": "Buscar usuario",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "iD6PXBV4TH9sFG9H",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nreturn $input.all().map(item => {\n    // Obtenemos la contraseña que el usuario escribió en el formulario (desde el nodo Webhook)\n    // Asegúrate de que tu nodo Webhook se llame exactamente 'Webhook' o cambia el nombre aquí\n    const webhookData = $('Receptor pagina').first().json.body || {};\n    const plainPassword = webhookData.password;\n\n    // Datos que vienen del nodo PostgreSQL (la fila del usuario encontrado)\n    const dbUser = item.json; \n\n    if (!dbUser || !dbUser.password_hash) {\n        item.json.success = false;\n        item.json.message = \"El correo electrónico no está registrado.\";\n        return item;\n    }\n\n    if (dbUser.estado === false) {\n        item.json.success = false;\n        item.json.message = \"Esta cuenta se encuentra inactiva o bloqueada.\";\n        return item;\n    }\n\n    // Extraemos el salt y el hash guardados en PostgreSQL (formato salt:hash)\n    const [salt, originalHash] = dbUser.password_hash.split(':');\n    \n    // Generamos el hash con la contraseña ingresada usando el mismo salt\n    const hashToTest = crypto.scryptSync(plainPassword, salt, 64).toString('hex');\n\n    // Comparamos de forma segura para validar la contraseña\n    const match = crypto.timingSafeEqual(\n        Buffer.from(originalHash, 'hex'),\n        Buffer.from(hashToTest, 'hex')\n    );\n\n    item.json.success = match;\n    item.json.message = match ? \"¡Inicio de sesión exitoso!\" : \"Contraseña incorrecta.\";\n    item.json.data = match ? {\n        id: dbUser.id,\n        nombre: dbUser.nombre_completo,\n        correo: dbUser.correo,\n        rol: dbUser.rol\n    } : null;\n    \n    return item;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -32
+      ],
+      "id": "47ac3443-cab5-4006-8903-d9ba79550ae0",
+      "name": "verificar contraseña"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": {{ $json.success }},\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        768,
+        -32
+      ],
+      "id": "521453aa-225a-4d13-84ab-ac26bd2be785",
+      "name": "Respuesta login"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, nombre_completo, correo FROM usuarios WHERE correo = $1 AND estado = true;",
+        "options": {
+          "queryReplacement": "={{ $json.body.email }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        384,
+        240
+      ],
+      "id": "6fe18b1e-b439-4f62-b7e6-90ee298112e6",
+      "name": "Buscar correo",
+      "credentials": {
+        "postgres": {
+          "id": "iD6PXBV4TH9sFG9H",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1f3c61a3-a565-4c38-b493-2d589aa0944d",
+              "leftValue": "={{ $json.correo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        576,
+        256
+      ],
+      "id": "29b30e9f-b572-4566-9daa-f23c05aa52d9",
+      "name": "El correo existe?"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.correo }}",
+        "subject": "Recuperacion de contraseña - Soporte Tecnico",
+        "message": "=Hola {{ $json.nombre_completo }},  Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en el sistema de soporte técnico.  Para continuar con el proceso, por favor ingresa al siguiente enlace: https://tudominio.com/reset-password?id={{ $json.id }}  Si tú no solicitaste este cambio, puedes ignorar este mensaje de forma segura.  Atentamente, Equipo de Soporte Técnico",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        160
+      ],
+      "id": "b1e05dba-cd7d-4bda-8562-bb395384b0d7",
+      "name": "Enviar correo gmail(recuperacion)",
+      "webhookId": "a3788cd2-8f85-488f-a5d0-99d4aa08c13c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4sGooR9hKOGlsqhZ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": true,\n  \"message\": \"¡Correo de recuperación enviado con éxito!\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1072,
+        176
+      ],
+      "id": "b2211a08-90f6-4cf3-ba92-e1468b6ed72e",
+      "name": "Respuesta correo enviado"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"El correo electrónico ingresado no se encuentra registrado.\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        848,
+        352
+      ],
+      "id": "a424a520-7014-4dff-b92e-6e239d8f2782",
+      "name": "Respuesta correo no encontrado"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receptor pagina": {
+      "main": [
+        [
+          {
+            "node": "Selector de accion (registo/Login/olvidecontrasenia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Selector de accion (registo/Login/olvidecontrasenia": {
+      "main": [
+        [
+          {
+            "node": "Encriptar contraseña",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar usuario",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encriptar contraseña": {
+      "main": [
+        [
+          {
+            "node": "Registrar usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar usuario": {
+      "main": [
+        [
+          {
+            "node": "Respuesta registro exitoso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar usuario": {
+      "main": [
+        [
+          {
+            "node": "verificar contraseña",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "verificar contraseña": {
+      "main": [
+        [
+          {
+            "node": "Respuesta login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar correo": {
+      "main": [
+        [
+          {
+            "node": "El correo existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "El correo existe?": {
+      "main": [
+        [
+          {
+            "node": "Enviar correo gmail(recuperacion)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta correo no encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar correo gmail(recuperacion)": {
+      "main": [
+        [
+          {
+            "node": "Respuesta correo enviado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "120c6fc4-9744-44fe-b3f3-140e8f362e4d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3b56989ef9295ee9c9351082700011d49d26f4d4d43255d7aaadc82d271ad0bd"
+  },
+  "nodeGroups": [],
+  "id": "nlOm5PUOLUVH6ZEl",
+  "tags": []
+}
