@@ -1,0 +1,547 @@
+{
+  "name": "Soporte tecnico - chat",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "let inputData = $input.item.json.body;\n\nif (!inputData) {\n  inputData = $input.item.json;\n}\n\nlet userId = inputData.user_id || 1;\nlet ticketId = inputData.ticket_id || null;\n\n// Capturamos el mensaje desde 'mensaje' o desde 'intentar' / 'descripcion_problema'\nlet mensajeUsuario = inputData.mensaje || inputData.descripcion_problema || '';\n\nlet intentoActual = inputData.intento_actual || inputData.intentar || 1;\n\nlet accion = inputData.accion;\nif (!accion) {\n  accion = 'nuevo_mensaje';\n}\n\nlet codigoTicket = inputData.codigo_ticket;\nif (!codigoTicket) {\n  codigoTicket = 'TKT-' + Date.now();\n}\n\nreturn {\n  json: {\n    accion: accion,\n    user_id: userId,\n    ticket_id: ticketId,\n    codigo_ticket: codigoTicket,\n    mensaje: mensajeUsuario,\n    intento_actual: intentoActual,\n    emisor: 'usuario'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        16
+      ],
+      "id": "2eefd91b-01fb-4970-b022-da4473674909",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "7e1a991c-9eb0-4370-8d92-7ad54ebcf18d",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        16
+      ],
+      "id": "0a22ad79-531c-49d0-9a6a-080798e1d373",
+      "name": "Webhook",
+      "webhookId": "7e1a991c-9eb0-4370-8d92-7ad54ebcf18d"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "nuevo_mensaje",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "a1b163c1-6d00-4333-b247-96fa2274376c"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b71b0fcd-c697-4cd8-a074-a48fa119bac6",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "solucionado",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "198cc9dc-8950-4250-aaf7-37467d971abc",
+                    "leftValue": "={{ $json.accion }}",
+                    "rightValue": "escalar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        368,
+        16
+      ],
+      "id": "f30c5f13-6de6-45c6-93f2-9cc31ea83e62",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH ticket_existente AS (\n    SELECT id FROM public.tickets WHERE id = NULLIF('{{ $json.ticket_id }}', '')::INT\n),\nnuevo_ticket AS (\n    INSERT INTO public.tickets (user_id, descripcion_problema, estado, intentos_ia)\n    SELECT \n        {{ $json.user_id }}, \n        '{{ $json.mensaje }}', \n        'en_proceso', \n        {{ $json.intento_actual }}\n    WHERE NOT EXISTS (SELECT 1 FROM ticket_existente)\n    RETURNING id\n),\nticket_final AS (\n    SELECT id FROM ticket_existente\n    UNION ALL\n    SELECT id FROM nuevo_ticket\n)\nINSERT INTO public.historial_chat (ticket_id, user_id, emisor, mensaje, intento_actual)\nSELECT \n    tf.id,\n    {{ $json.user_id }},\n    'usuario',\n    '{{ $json.mensaje }}',\n    {{ $json.intento_actual }}\nFROM ticket_final tf\nRETURNING \n    ticket_id, \n    {{ $json.intento_actual }} AS intento_actual,\n    (SELECT correo FROM public.usuarios WHERE id = {{ $json.user_id }}) AS correo_usuario, \n    (SELECT nombre_completo FROM public.usuarios WHERE id = {{ $json.user_id }}) AS nombre_usuario;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        592,
+        -176
+      ],
+      "id": "8c49f044-ee7a-401f-9b4c-e88c61b63516",
+      "name": "guardar msg usuario",
+      "credentials": {
+        "postgres": {
+          "id": "iD6PXBV4TH9sFG9H",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.tickets \nSET estado = 'resuelto_ia', \n    fecha_actualizacion = CURRENT_TIMESTAMP \nWHERE id = {{ $json.ticket_id }};\n\nINSERT INTO public.historial_chat (ticket_id, user_id, emisor, mensaje, intento_actual)\nVALUES (\n    {{ $json.ticket_id }},\n    {{ $json.user_id }},\n    'sistema',\n    'El caso fue marcado como resuelto por el usuario.',\n    {{ $json.intento_actual }}\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        592,
+        32
+      ],
+      "id": "15e18a53-f6c2-4a73-8a02-2679734b1cc3",
+      "name": "FInalizar ticket",
+      "credentials": {
+        "postgres": {
+          "id": "iD6PXBV4TH9sFG9H",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cd10cad3-3a31-4661-b675-056411d5e08e",
+              "leftValue": "={{ $json.intento_actual }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        816,
+        -176
+      ],
+      "id": "7332dcfa-16f8-45b4-a676-6029d6430b12",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "fromEmail": "=jmsoporte1@hotmail.com",
+        "toEmail": "={{ $json.correo_usuario }}",
+        "subject": "=[Ticket #{{ $json.ticket_id }}] Solicitud de soporte recibida",
+        "html": "=<h3>¡Hola {{ $json.nombre_usuario }}!</h3>\n<p>Hemos recibido tu solicitud de soporte técnico. Tu número de ticket es: <strong>#{{ $json.ticket_id }}</strong>.</p>\n<p>Nuestro asistente virtual te proporcionará la mejor alternativa en el chat.</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1280,
+        -288
+      ],
+      "id": "787c4c3c-1e7f-4ca1-8d5c-d4d521f29aa1",
+      "name": "Send an Email",
+      "webhookId": "76041ada-680b-48f3-840e-ee9f7fce78da",
+      "credentials": {
+        "smtp": {
+          "id": "k64y7ko9RbrwXZAd",
+          "name": "SMTP account 2"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3-flash-preview",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3-flash-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $('Code in JavaScript').item.json.mensaje }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1168,
+        -48
+      ],
+      "id": "dada0474-907e-40ea-ac79-35df41cedfcc",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Fzq5nEtwiBJnHwt4",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1920,
+        -32
+      ],
+      "id": "8a6030ab-7427-4320-b51b-0a0214363793",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"status\": \"closed\",\n  \"mensaje\": \"El ticket ha sido marcado como resuelto exitosamente.\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        816,
+        32
+      ],
+      "id": "6d2d319a-3c70-431c-9651-5a2836d79490",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "fromEmail": "jmsoporte1@hotmail.com",
+        "toEmail": "jmsoporte1@hotmail.com",
+        "subject": "🚨 [ESCALADO] Ticket #{{ $json.ticket_id }} - Atención Requerida",
+        "html": "=<h2>Caso Escalado a Soporte Técnico</h2>\n<ul>\n  <li><strong>Ticket ID:</strong> {{ $json.ticket_id }}</li>\n  <li><strong>Cliente:</strong> {{ $json.nombre_completo }}</li>\n  <li><strong>Cédula:</strong> {{ $json.cedula }}</li>\n  <li><strong>Correo:</strong> {{ $json.correo }}</li>\n  <li><strong>Teléfono:</strong> {{ $json.telefono }}</li>\n</ul>\n<p><strong>Descripción del problema:</strong> {{ $json.descripcion_problema }}</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        816,
+        224
+      ],
+      "id": "fb7b51f2-a469-47b9-8da3-23ae8ffa98f1",
+      "name": "Send an Email1",
+      "webhookId": "83a76c97-029d-4d45-b32c-4d9cda16f73d",
+      "credentials": {
+        "smtp": {
+          "id": "cmQJi8ovq2RxLqhO",
+          "name": "SMTP account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"status\": \"escalated\",\n  \"mensaje\": \"Tu caso ha sido escalado con éxito. Un técnico humano se pondrá en contacto contigo a la brevedad.\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1040,
+        224
+      ],
+      "id": "62d62705-9cd5-4563-8b72-266ea3b411a1",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.historial_chat (ticket_id, user_id, emisor, mensaje, intento_actual)\nVALUES (\n    {{ $('guardar msg usuario').item.json.ticket_id }},\n    (SELECT user_id FROM public.tickets WHERE id = {{ $('guardar msg usuario').item.json.ticket_id }}),\n    'ia',\n    '{{ $json.candidates[0].content.parts[0].text.replace(/'/g, \"''\") }}',\n    COALESCE({{ $('guardar msg usuario').item.json.intento_actual }}, 1)\n)\nRETURNING \n    ticket_id, \n    mensaje AS respuesta_ia;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1488,
+        -48
+      ],
+      "id": "ce29e13c-2619-4bfe-a81d-76bb095df34e",
+      "name": "Guardar respuesta ia",
+      "credentials": {
+        "postgres": {
+          "id": "iD6PXBV4TH9sFG9H",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.tickets \nSET estado = 'escalado_humano', \n    fecha_actualizacion = CURRENT_TIMESTAMP \nWHERE id = {{ $json.ticket_id }};\n\nSELECT \n    t.id AS ticket_id,\n    u.nombre_completo,\n    u.cedula,\n    u.correo,\n    u.telefono,\n    t.descripcion_problema\nFROM public.tickets t\nJOIN public.usuarios u ON t.user_id = u.id\nWHERE t.id = {{ $json.ticket_id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        592,
+        224
+      ],
+      "id": "9d81fbdd-b315-448a-b134-dec99934fe1a",
+      "name": "escalar ticket",
+      "credentials": {
+        "postgres": {
+          "id": "iD6PXBV4TH9sFG9H",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Leemos la entrada directa que viene del nodo anterior (Guardar respuesta ia)\nconst itemData = $input.first().json;\n\nlet ticketId = itemData.ticket_id || $('guardar msg usuario').first().json.ticket_id;\nlet geminiText = itemData.respuesta_ia || \"Sin respuesta generada\";\n\nreturn {\n  json: {\n    status: \"success\",\n    ticket_id: ticketId,\n    response: geminiText,       // Para tu ChatApp.js\n    respuesta_ia: geminiText    // Para compatibilidad general\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        -48
+      ],
+      "id": "b1942e8b-2d3c-4810-a0ab-b9d6055e688b",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "guardar msg usuario",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "FInalizar ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "escalar ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "guardar msg usuario": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an Email": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Guardar respuesta ia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FInalizar ticket": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an Email1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar respuesta ia": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "escalar ticket": {
+      "main": [
+        [
+          {
+            "node": "Send an Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8b6851ac-daeb-4aca-a800-cdaaa883da99",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3b56989ef9295ee9c9351082700011d49d26f4d4d43255d7aaadc82d271ad0bd"
+  },
+  "nodeGroups": [],
+  "id": "lcTET9clocXfDjrm",
+  "tags": []
+}
