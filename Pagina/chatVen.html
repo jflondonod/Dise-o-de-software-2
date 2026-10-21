@@ -13,22 +13,25 @@
         <aside class="sidebar">
             <div class="sidebar-top">
                 <nav class="nav-menu">
-                    <!-- Boton de inicio -->   
-                    <a href="#" class="nav-link">
+                    <!-- Indicador flotante deslizante -->
+                    <div class="nav-indicator"></div>
+
+                    <!-- Botón de Inicio (apunta a homeVentana.html) -->   
+                    <a href="homeVentana.html" class="nav-link">
                         <img width="30" height="30" src="Iconos/HomeNegro.png" alt="Inicio" class="custom-icon">
                         Inicio
                     </a>
-                    <!-- Boton de Soporte (Activo) -->   
-                    <a href="#" class="nav-link active">
-                        <img width="30" height="30" src="Iconos/soporte blanco.png" alt="Usuario" class="custom-icon">
+                    <!-- Botón de Soporte (Activo) -->   
+                    <a href="chatVen.html" class="nav-link active">
+                        <img width="30" height="30" src="Iconos/soporte blanco.png" alt="Soporte" class="custom-icon">
                         Soporte
                     </a>
-                    <!-- Boton de Dashboard -->   
+                    <!-- Botón de Dashboard -->   
                     <a href="#" class="nav-link">
                         <img width="30" height="30" src="Iconos/barras.png" alt="Dashboard" class="custom-icon">
                         Dashboard
                     </a>
-                    <!-- Boton de Ajustes -->   
+                    <!-- Botón de Ajustes -->   
                     <a href="#" class="nav-link">
                         <img width="30" height="30" src="Iconos/ajustes.png" alt="Ajustes" class="custom-icon">
                         Ajustes
@@ -42,7 +45,7 @@
                     <div class="user-avatar-container">
                         <img src="Iconos/usuariGris.png" alt="Usuario" class="user-avatar-icon">
                     </div>
-                    <span class="user-name">Usuario</span>
+                    <span class="user-name" id="sidebar-user-name">Usuario</span>
                 </div>
             </div>
         </aside>
@@ -52,11 +55,11 @@
             <div class="chat-container" id="chat-container-wrapper">
                 <!-- Vista de Bienvenida Centrada (Visible al entrar) -->
                 <div class="welcome-screen" id="welcome-screen">
-                    <h2>✨ ¿En que puedo ayudarte hoy?</h2>
+                    <h2>✨ ¿En qué puedo ayudarte hoy?</h2>
                     <p>Escribe tu consulta o describe el inconveniente para comenzar.</p>
                 </div>
 
-                <!-- Contenedor donde se cargarán dinámicamente los mensajes (Oculto al inicio) -->
+                <!-- Contenedor donde se cargarán dinámicamente los mensajes -->
                 <div class="chat-messages" id="chat-messages" style="display: none;"></div>
 
                 <!-- Barra de entrada de chat interactiva -->
@@ -70,7 +73,7 @@
                 </div>
             </div>
 
-            <!-- Formulario de Escalamiento Humano (Oculto inicialmente, aparece al agotar los 3 intentos) -->
+            <!-- Formulario de Escalamiento Humano -->
             <div id="escalation-form-container" style="display: none; max-width: 680px; width: 100%; margin: 20px auto 0 auto; padding: 20px; background: #ffffff; border-radius: 14px; border: 1px solid var(--border-color); box-shadow: var(--shadow);">
                 <h3 style="margin-top: 0; color: var(--text-color);">⚠️ Escalar caso a Soporte Humano</h3>
                 <p style="font-size: 14px; color: var(--text-muted);">Hemos agotado los intentos automáticos de la IA. Por favor, indícanos tus datos para que un técnico se comunique contigo:</p>

@@ -1,5 +1,5 @@
 // URL de tu Webhook en n8n (Asegúrate de cambiarla por la URL activa de tu nodo Webhook en n8n)
-const WEBHOOK_URL = 'http://localhost:5678/webhook-test/e7762214-306c-4532-8bd0-c89198155be4';
+const WEBHOOK_URL = 'http://localhost:5678/webhook/e7762214-306c-4532-8bd0-c89198155be4';
 
 function switchAuthTab(view, direction = 'forward') {
     const tabsContainer = document.getElementById('authTabs');
@@ -59,7 +59,7 @@ async function handleLogin(e) {
         if (result.success) {
             alert('¡Inicio de sesión exitoso!');
             localStorage.setItem('user', JSON.stringify(result.data));
-            window.location.href = 'index.html'; // Redirige a tu panel principal de soporte
+            window.location.href = 'homeVentana.html'; // Redirige a tu panel principal de soporte
         } else {
             alert(result.message || 'Credenciales incorrectas o cuenta inactiva.');
         }
