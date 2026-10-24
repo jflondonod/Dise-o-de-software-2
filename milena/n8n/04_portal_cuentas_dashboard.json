@@ -1,0 +1,1607 @@
+{
+  "name": "04 — Portal: cuentas, técnico, dashboard y cierre auditado",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "soporte/portal-tecnico",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook portal",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        600
+      ],
+      "webhookId": "ce316d1c-99ae-5056-8fcb-b8077c188803",
+      "id": "62966c88-cd63-546d-8e81-29940d498aac"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normaliza la petición y decide la ruta. Nunca lanza errores: si algo está mal\n// responde {success:false, message} para que la página pueda mostrarlo.\nconst FRONTEND_URL = 'http://localhost:3000'; // cámbialo cuando tengas dominio\nconst b = $json.body ?? $json;\nconst txt = (v, max) => String(v ?? '').trim().slice(0, max);\nconst fecha = (v) => /^\\d{4}-\\d{2}-\\d{2}$/.test(String(v ?? '')) ? String(v) : '';\n\nconst publicas = ['register', 'login', 'forgot', 'reset_password'];\nconst privadas = ['me', 'logout', 'mis_tickets', 'detalle_ticket', 'cola_tecnico', 'cerrar_ticket',\n                  'dashboard', 'tickets_admin', 'asignar_tecnico'];\nconst accion = txt(b.accion ?? b.action, 40).toLowerCase();\n\nconst d = {\n  accion,\n  session_token: txt(b.session_token, 200),\n  email: txt(b.email ?? b.correo, 254).toLowerCase(),\n  password: String(b.password ?? '').slice(0, 200),\n  nombre: txt(b.name ?? b.nombre_completo ?? b.nombre, 150),\n  identificacion: txt(b.cedula ?? b.identificacion, 50),\n  telefono: txt(b.phone ?? b.telefono, 30),\n  reset_token: txt(b.reset_token ?? b.token, 200),\n  new_password: String(b.new_password ?? '').slice(0, 200),\n  ticket_id: Number.parseInt(b.ticket_id, 10) || 0,\n  tecnico_id: Number.parseInt(b.tecnico_id, 10) || 0,\n  fecha_inicio: txt(b.fecha_inicio, 40),\n  url_acta: txt(b.url_acta, 1000),\n  resultado: txt(b.resultado, 4000),\n  estado: txt(b.estado, 30),\n  desde: fecha(b.desde),\n  hasta: fecha(b.hasta),\n  frontend_url: FRONTEND_URL,\n};\n\nconst correoOk = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(d.email);\nconst claveOk = (p) => p.length >= 10 && Buffer.byteLength(p, 'utf8') <= 72;\nlet error = '';\nlet status = 'invalid';\nif (![...publicas, ...privadas].includes(accion)) error = 'Acción no válida.';\nelse if (['register', 'login', 'forgot'].includes(accion) && !correoOk) error = 'Escribe un correo electrónico válido.';\nelse if (accion === 'register' && d.nombre.length < 2) error = 'Escribe tu nombre completo.';\nelse if (accion === 'register' && !claveOk(d.password)) error = 'La contraseña debe tener al menos 10 caracteres.';\nelse if (accion === 'login' && !d.password) error = 'Escribe tu contraseña.';\nelse if (accion === 'reset_password' && !/^[0-9a-f]{64}$/.test(d.reset_token)) error = 'El enlace de recuperación no es válido.';\nelse if (accion === 'reset_password' && !claveOk(d.new_password)) error = 'La nueva contraseña debe tener al menos 10 caracteres.';\nelse if (privadas.includes(accion) && !d.session_token) { error = 'Inicia sesión para continuar.'; status = 'unauthorized'; }\nelse if (['detalle_ticket', 'cerrar_ticket', 'asignar_tecnico'].includes(accion) && d.ticket_id < 1) error = 'Número de ticket inválido.';\nelse if (accion === 'cerrar_ticket' && !/^https?:\\/\\/\\S+\\.pdf$/i.test(d.url_acta)) error = 'Adjunta el acta en PDF antes de cerrar el ticket.';\nelse if (accion === 'cerrar_ticket' && d.resultado.length < 5) error = 'Describe el resultado del servicio (mínimo 5 caracteres).';\nelse if (accion === 'asignar_tecnico' && d.tecnico_id < 1) error = 'Selecciona un técnico.';\nelse if (accion === 'asignar_tecnico' && Number.isNaN(Date.parse(d.fecha_inicio))) error = 'Selecciona la fecha y hora de la visita.';\n\nif (accion === 'asignar_tecnico' && !error) d.fecha_inicio = new Date(d.fecha_inicio).toISOString();\nconst ruta = error ? 'invalido' : (publicas.includes(accion) ? accion : 'sesion');\nreturn [{ json: { ...d, ruta, error, status } }];\n"
+      },
+      "name": "Validar acción de portal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        600
+      ],
+      "id": "f6ce0aeb-ada1-5475-b3bc-249b125b994c"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "399ff8c5-e78b-59bf-9276-7138ff94d726",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "invalido",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "invalido"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "edc1ff10-0741-561b-9da5-2baf0962f346",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "register",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "register"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a3c93176-16ed-5f6f-b218-d63de51f912a",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "login",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "login"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d23a82e5-48fd-5885-af97-f3e24c0a0af3",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "forgot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "forgot"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "58f1308a-e427-5fda-b049-56d12117b796",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "reset_password",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reset_password"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b7edfe9a-74d6-5325-ba9d-595578f3f1b2",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "sesion",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sesion"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Enrutar acción",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        440,
+        600
+      ],
+      "id": "944c947d-0639-5c31-a94d-47619c9af279"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, status: $json.status, message: $json.error } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder petición inválida",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        700,
+        -200
+      ],
+      "id": "682066ff-ba60-5aa3-97b7-ea303f0178b3"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH ins AS (\n  INSERT INTO public.usuarios (nombre_completo, identificacion, correo, telefono, password_hash, rol, activo)\n  VALUES ($1, NULLIF($2, ''), lower($3), NULLIF($4, ''), crypt($5, gen_salt('bf', 10)), 'cliente', true)\n  ON CONFLICT DO NOTHING\n  RETURNING id, nombre_completo, correo, rol\n)\nSELECT ins.* FROM (SELECT 1) seed LEFT JOIN ins ON true;",
+        "options": {
+          "queryReplacement": "={{ [$json.nombre, $json.identificacion, $json.email, $json.telefono, $json.password] }}"
+        }
+      },
+      "name": "Crear cuenta cliente",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        700,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "902364ef-fcbf-5b84-b8e5-c2d875865bcd"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.id ? { success: true, status: 'registered', message: 'Cuenta creada. Ya puedes iniciar sesión.', data: { id: Number($json.id), nombre: $json.nombre_completo, correo: $json.correo, rol: $json.rol } } : { success: false, status: 'duplicated', message: 'Ese correo ya tiene una cuenta. Si no recuerdas la contraseña usa ¿Olvidaste tu contraseña?' } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder registro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        940,
+        0
+      ],
+      "id": "0f1790c8-d30b-5ef1-8f94-ad2da8d092e1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH u AS (\n  SELECT id, nombre_completo, correo, rol\n    FROM public.usuarios\n   WHERE lower(correo) = lower($1) AND activo\n     AND password_hash IS NOT NULL AND password_hash = crypt($2, password_hash)\n   LIMIT 1\n), tok AS (\n  SELECT encode(gen_random_bytes(32), 'hex') AS token\n), s AS (\n  INSERT INTO public.sesiones_usuario (usuario_id, token_hash, expira_en)\n  SELECT u.id, encode(digest(tok.token, 'sha256'), 'hex'), now() + interval '8 hours' FROM u, tok\n  RETURNING expira_en\n)\nSELECT u.id, u.nombre_completo, u.correo, u.rol,\n       CASE WHEN u.id IS NOT NULL THEN tok.token END AS session_token,\n       (SELECT expira_en FROM s) AS expira_en\n  FROM (SELECT 1) seed LEFT JOIN u ON true CROSS JOIN tok;",
+        "options": {
+          "queryReplacement": "={{ [$json.email, $json.password] }}"
+        }
+      },
+      "name": "Validar credenciales y crear sesión",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        700,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "c33e75ff-ef74-57f3-81cb-66441ca33c1b"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.id ? { success: true, status: 'ok', message: 'Inicio de sesión correcto.', session_token: $json.session_token, expires_at: $json.expira_en, data: { id: Number($json.id), nombre: $json.nombre_completo, correo: $json.correo, rol: $json.rol } } : { success: false, status: 'invalid_credentials', message: 'Correo o contraseña incorrectos, o la cuenta está inactiva.' } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder login",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        940,
+        200
+      ],
+      "id": "2e8e0680-1822-5357-bddc-a5df1e6080ad"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH u AS (\n  SELECT id, nombre_completo, correo\n    FROM public.usuarios us\n   WHERE lower(us.correo) = lower($1) AND us.activo\n     -- máximo un correo cada 2 minutos por cuenta\n     AND NOT EXISTS (SELECT 1 FROM public.tokens_recuperacion r\n                      WHERE r.usuario_id = us.id AND r.creado_en > now() - interval '2 minutes')\n   LIMIT 1\n), tok AS (\n  SELECT encode(gen_random_bytes(32), 'hex') AS token\n), ins AS (\n  INSERT INTO public.tokens_recuperacion (usuario_id, token_hash, expira_en)\n  SELECT u.id, encode(digest(tok.token, 'sha256'), 'hex'), now() + interval '30 minutes' FROM u, tok\n  RETURNING id\n)\nSELECT u.id AS usuario_id, u.nombre_completo, u.correo,\n       CASE WHEN (SELECT count(*) FROM ins) > 0 THEN tok.token ELSE '' END AS token,\n       $2::text AS frontend_url\n  FROM (SELECT 1) seed LEFT JOIN u ON true CROSS JOIN tok;",
+        "options": {
+          "queryReplacement": "={{ [$json.email, $json.frontend_url] }}"
+        }
+      },
+      "name": "Generar token de recuperación",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        700,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "c393f49c-05b2-5b5d-b62b-23d889902f02"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3628898d-bbe4-5af1-bee9-ca065af25e66",
+              "leftValue": "={{ !!$json.token }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "¿Hay cuenta para recuperar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        940,
+        400
+      ],
+      "id": "b0cee2f0-0859-5823-a960-c6cdcc622a32"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.correo }}",
+        "subject": "Restablecer contraseña — Soporte Técnico",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Arial,sans-serif;font-size:14px;color:#172b4d\">Hola {{ $json.nombre_completo }},<br><br>Recibimos una solicitud para restablecer tu contraseña. Usa este enlace dentro de los próximos 30 minutos:<br><br><a href=\"{{ $json.frontend_url }}/resetPassword.html?token={{ $json.token }}\">Restablecer contraseña</a><br><br>Si no hiciste esta solicitud, ignora este mensaje.<br><br>Equipo de Soporte Técnico</div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Enviar correo de recuperación",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1180,
+        340
+      ],
+      "webhookId": "681fc1ac-5f14-58a5-bff8-e113497b5664",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "RRhqAKrSTV5WDEoW",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "abde4470-6eb5-5055-9cf3-6b6b883214e2"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, status: 'ok', message: 'Si el correo está registrado, recibirás un enlace para restablecer la contraseña.' } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder recuperación",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1420,
+        400
+      ],
+      "id": "ff514b5c-394b-5e2f-89aa-d8e2d6d3bf76"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH tok AS (\n  SELECT id, usuario_id FROM public.tokens_recuperacion\n   WHERE token_hash = encode(digest($1::text, 'sha256'), 'hex') AND usado_en IS NULL AND expira_en > now()\n   ORDER BY creado_en DESC LIMIT 1\n   FOR UPDATE\n), upd AS (\n  UPDATE public.usuarios u SET password_hash = crypt($2, gen_salt('bf', 10)), actualizado_en = now()\n    FROM tok WHERE u.id = tok.usuario_id AND u.activo\n  RETURNING u.id\n), usados AS (\n  UPDATE public.tokens_recuperacion r SET usado_en = now()\n   WHERE r.usuario_id IN (SELECT id FROM upd) AND r.usado_en IS NULL\n), cerrar_sesiones AS (\n  UPDATE public.sesiones_usuario s SET revocado_en = now()\n   WHERE s.usuario_id IN (SELECT id FROM upd) AND s.revocado_en IS NULL\n)\nSELECT EXISTS (SELECT 1 FROM upd) AS success;",
+        "options": {
+          "queryReplacement": "={{ [$json.reset_token, $json.new_password] }}"
+        }
+      },
+      "name": "Aplicar nueva contraseña",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        700,
+        600
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "299665e2-521a-595d-9554-d12f4a671993"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.success ? { success: true, status: 'ok', message: 'Contraseña actualizada. Ya puedes iniciar sesión.' } : { success: false, status: 'invalid_token', message: 'El enlace expiró, ya fue usado o no es válido. Solicita uno nuevo.' } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder restablecimiento",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        940,
+        600
+      ],
+      "id": "ea538c6d-bfd0-5bcb-aeac-147184c7c46f"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT u.id AS usuario_id, u.nombre_completo, u.correo, u.rol, te.id AS tecnico_id\n  FROM (SELECT 1) seed\n  LEFT JOIN public.sesiones_usuario s\n         ON s.token_hash = encode(digest($1::text, 'sha256'), 'hex') AND s.revocado_en IS NULL AND s.expira_en > now()\n  LEFT JOIN public.usuarios u ON u.id = s.usuario_id AND u.activo\n  LEFT JOIN public.tecnicos te ON te.usuario_id = u.id AND te.activo\n LIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [$json.session_token] }}"
+        }
+      },
+      "name": "Validar sesión y obtener rol",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        700,
+        1000
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "fc39410c-a794-57d2-8c20-5fa139967370"
+    },
+    {
+      "parameters": {
+        "jsCode": "const req = $('Validar acción de portal').first().json;\nconst s = $input.first().json;\nconst TODOS = ['cliente', 'tecnico', 'admin'];\nconst permisos = {\n  me: TODOS, logout: TODOS, mis_tickets: TODOS, detalle_ticket: TODOS,\n  cola_tecnico: ['tecnico'], cerrar_ticket: ['tecnico'],\n  dashboard: ['admin'], tickets_admin: ['admin'], asignar_tecnico: ['admin'],\n};\nlet ruta = req.accion, status = 'ok', message = '';\nif (!s.usuario_id) {\n  ruta = 'denegado'; status = 'unauthorized'; message = 'Tu sesión expiró o no es válida. Inicia sesión nuevamente.';\n} else if (!(permisos[req.accion] || []).includes(s.rol)) {\n  ruta = 'denegado'; status = 'forbidden'; message = 'Tu cuenta no tiene permiso para esta acción.';\n} else if (['cola_tecnico', 'cerrar_ticket'].includes(req.accion) && !s.tecnico_id) {\n  ruta = 'denegado'; status = 'forbidden'; message = 'Tu usuario técnico no está activo en la tabla de técnicos.';\n}\nreturn [{ json: { ...req, password: '', new_password: '', ruta, status, message,\n  auth_usuario_id: Number(s.usuario_id || 0), auth_nombre: s.nombre_completo || '', auth_correo: s.correo || '',\n  auth_rol: s.rol || '', auth_tecnico_id: Number(s.tecnico_id || 0) } }];\n"
+      },
+      "name": "Autorizar acción según rol",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        1000
+      ],
+      "id": "20ccd2ad-1bb9-5928-be2c-dc9d803108fb"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "060c1b12-7376-5f0c-ab4c-ccbb7384ca17",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "denegado",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "denegado"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e985a8ad-99fe-51db-8a57-369cbc6552d3",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "me",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "me"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ea52bda4-819c-5e6c-b643-f9dee4c69796",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "logout",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "logout"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e6386e78-8291-51b6-bb63-c6579c8be88d",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "mis_tickets",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "mis_tickets"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4d311370-9d6a-5004-a11f-22ea3762b21e",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "detalle_ticket",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "detalle_ticket"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e6fb3b48-bda3-5cd2-b13d-7e852b83e2da",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "cola_tecnico",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cola_tecnico"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6d99f8bd-4a59-5402-b430-4c6a0068bebe",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "cerrar_ticket",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cerrar_ticket"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d4d1421c-7796-54ba-8c44-e3c55bcb3c06",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "dashboard",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "dashboard"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9163de7e-76d1-562b-a093-b1bf7c05e3b8",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "tickets_admin",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "tickets_admin"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "2bc54bea-d992-5b54-ac2f-80a0f9321e21",
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "asignar_tecnico",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "asignar_tecnico"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Enrutar acción autorizada",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1180,
+        1000
+      ],
+      "id": "1dd8b84a-3b24-5c39-80a3-444a2d049c8b"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, status: $json.status, message: $json.message } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder acceso denegado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1460,
+        800
+      ],
+      "id": "318f82c6-d673-5658-a17c-0fc4e2583618"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, status: 'ok', data: { id: $json.auth_usuario_id, nombre: $json.auth_nombre, correo: $json.auth_correo, rol: $json.auth_rol, tecnico_id: $json.auth_tecnico_id } } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder datos de sesión",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1460,
+        980
+      ],
+      "id": "605ee4fe-276f-5d47-afb0-f5b86c20827d"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.sesiones_usuario SET revocado_en = now()\n WHERE token_hash = encode(digest($1::text, 'sha256'), 'hex') AND revocado_en IS NULL;",
+        "options": {
+          "queryReplacement": "={{ [$json.session_token] }}"
+        }
+      },
+      "name": "Cerrar sesión",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1460,
+        1160
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "alwaysOutputData": true,
+      "id": "aec6ab92-1a23-5e1f-b978-de4bf74a20ab"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, status: 'ok', message: 'Sesión cerrada.' } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder cierre de sesión",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1700,
+        1160
+      ],
+      "id": "d188ffc2-8971-58f1-a407-9640fbb8752d"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ Object.assign({ success: true, status: 'ok' }, $json.data) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder lista",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1940,
+        1700
+      ],
+      "id": "498ed428-b179-5397-bf23-d2a771976d26"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT jsonb_build_object('tickets', COALESCE(jsonb_agg(x ORDER BY x.fecha_creacion DESC), '[]'::jsonb)) AS data\n  FROM (\n    SELECT t.id AS ticket_id, t.estado, t.tipo_dispositivo, left(t.descripcion_problema, 160) AS descripcion,\n           t.fecha_creacion, t.fecha_visita, t.fecha_cierre, t.intentos_ia, t.url_acta, t.canal_origen,\n           te.nombre AS tecnico_nombre\n      FROM public.tickets_soporte t\n      LEFT JOIN public.tecnicos te ON te.id = t.tecnico_asignado_id\n     WHERE t.usuario_id = $1 OR lower(t.correo) = lower($2)\n     ORDER BY t.fecha_creacion DESC\n     LIMIT 50\n  ) x;",
+        "options": {
+          "queryReplacement": "={{ [$json.auth_usuario_id, $json.auth_correo] }}"
+        }
+      },
+      "name": "Consultar mis tickets",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1460,
+        1340
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "0d1d211a-6e59-5241-89ea-a9c5dd1b0eed"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT t.id AS ticket_id, t.nombre_completo, t.correo, t.telefono, t.direccion, t.tipo_dispositivo,\n       t.descripcion_problema, t.estado, t.fecha_creacion, t.fecha_visita, t.fecha_cierre, t.intentos_ia,\n       t.nivel_impacto, t.categoria, t.url_acta, t.canal_origen, te.nombre AS tecnico_nombre,\n       COALESCE((SELECT jsonb_agg(jsonb_build_object('emisor', h.emisor, 'mensaje', h.mensaje, 'fecha', h.fecha_mensaje)\n                                  ORDER BY h.fecha_mensaje, h.id)\n                   FROM public.historial_chat h WHERE h.ticket_id = t.id), '[]'::jsonb) AS historial\n  FROM (SELECT 1) seed\n  LEFT JOIN public.tickets_soporte t\n         ON t.id = $1\n        AND ($2 = 'admin'\n             OR ($2 = 'tecnico' AND t.tecnico_asignado_id = $3)\n             OR t.usuario_id = $4 OR lower(t.correo) = lower($5))\n  LEFT JOIN public.tecnicos te ON te.id = t.tecnico_asignado_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.ticket_id, $json.auth_rol, $json.auth_tecnico_id, $json.auth_usuario_id, $json.auth_correo] }}"
+        }
+      },
+      "name": "Consultar detalle e historial del ticket",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1460,
+        1520
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "2452667b-4ffe-54a1-8168-70626606f806"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.ticket_id ? { success: true, status: 'ok', data: $json } : { success: false, status: 'not_found', message: 'No encontramos ese ticket o no tienes acceso a él.' } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder detalle del ticket",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1700,
+        1520
+      ],
+      "id": "417d772b-5acc-5791-ab07-16218f8eef88"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT jsonb_build_object('tickets', COALESCE(jsonb_agg(x ORDER BY x.fecha_visita NULLS LAST, x.fecha_creacion), '[]'::jsonb)) AS data\n  FROM (\n    SELECT t.id AS ticket_id, t.nombre_completo, t.correo, t.telefono, t.direccion, t.tipo_dispositivo,\n           left(t.descripcion_problema, 300) AS descripcion, t.estado, t.fecha_creacion, t.fecha_visita,\n           t.nivel_impacto, t.categoria, c.id AS cita_id, c.cuadrante\n      FROM public.tickets_soporte t\n      LEFT JOIN public.citas c ON c.ticket_id = t.id AND c.estado = 'Agendada'\n     WHERE t.tecnico_asignado_id = $1 AND t.estado NOT IN ('Cerrado', 'Cancelado', 'Resuelto IA')\n  ) x;",
+        "options": {
+          "queryReplacement": "={{ [$json.auth_tecnico_id] }}"
+        }
+      },
+      "name": "Consultar cola del técnico",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1460,
+        1700
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "3a27de6f-747b-5c5c-adf9-47414ce77900"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH valido AS (\n  SELECT t.id, t.estado FROM public.tickets_soporte t\n   WHERE t.id = $1 AND t.tecnico_asignado_id = $2 AND t.estado IN ('Agendado', 'En atención')\n   FOR UPDATE\n), upd AS (\n  UPDATE public.tickets_soporte t SET estado = 'Cerrado', fecha_cierre = now(), url_acta = $3\n    FROM valido v WHERE t.id = v.id\n  RETURNING t.id AS ticket_id, t.nombre_completo, t.correo, t.estado, t.url_acta, t.fecha_cierre\n), cita AS (\n  UPDATE public.citas c SET estado = 'Realizada'\n   WHERE c.ticket_id IN (SELECT ticket_id FROM upd) AND c.estado = 'Agendada'\n), audit AS (\n  INSERT INTO public.auditoria_tickets (ticket_id, actor, accion, estado_anterior, estado_nuevo, detalle)\n  SELECT u.ticket_id, 'tecnico:' || $2, 'cierre_tecnico', v.estado, 'Cerrado',\n         jsonb_build_object('resultado', $4::text, 'url_acta', $3::text)\n    FROM upd u JOIN valido v ON v.id = u.ticket_id\n)\nSELECT upd.*, $4::text AS resultado FROM (SELECT 1) seed LEFT JOIN upd ON true;",
+        "options": {
+          "queryReplacement": "={{ [$json.ticket_id, $json.auth_tecnico_id, $json.url_acta, $json.resultado] }}"
+        }
+      },
+      "name": "Cerrar ticket con evidencia PDF",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1460,
+        1880
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "c156d573-c8fb-51b8-a140-12cb587189bf"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "345de1f0-c3ea-5a6b-a71f-d51b30f0ea6a",
+              "leftValue": "={{ !!$json.ticket_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "¿Se cerró el ticket?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1940,
+        1880
+      ],
+      "id": "fd70c50a-86e5-5d38-86f8-5650f4d5b221"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.correo }}",
+        "subject": "=Servicio finalizado — Ticket #{{ $json.ticket_id }}",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Arial,sans-serif;font-size:14px;color:#172b4d\">Hola {{ $json.nombre_completo }},<br><br>El servicio técnico de tu ticket <b>#{{ $json.ticket_id }}</b> fue finalizado.<br><b>Resultado:</b> {{ $json.resultado }}<br><b>Acta del servicio:</b> <a href=\"{{ $json.url_acta }}\">descargar PDF</a><br><br>Equipo de Soporte Técnico</div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Notificar cierre al cliente",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2180,
+        1880
+      ],
+      "webhookId": "6f51ae11-7f44-597f-a25b-4ce80657ea31",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "RRhqAKrSTV5WDEoW",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "5100583a-4e80-50e2-b91c-bd18c5e1190f"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.ticket_id ? { success: true, status: 'closed', message: 'Ticket cerrado. Se notificó al cliente.', ticket_id: $json.ticket_id } : { success: false, status: 'closure_rejected', message: 'No se cerró: el ticket no está asignado a ti o no está en estado Agendado / En atención.' } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder cierre técnico",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1700,
+        1880
+      ],
+      "id": "78b4ad0f-0c53-5cbd-be90-4e2f4cd85d40"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH f AS (\n  SELECT * FROM public.tickets_soporte\n   WHERE fecha_creacion >= COALESCE(NULLIF($1, '')::date, '-infinity'::date)\n     AND fecha_creacion <  COALESCE(NULLIF($2, '')::date + 1, 'infinity'::date)\n)\nSELECT jsonb_build_object(\n  'total_tickets',          count(*),\n  'pendientes',             count(*) FILTER (WHERE estado = 'Pendiente'),\n  'en_diagnostico',         count(*) FILTER (WHERE estado = 'En diagnóstico'),\n  'escalamiento_pendiente', count(*) FILTER (WHERE estado = 'Escalamiento pendiente'),\n  'escalados_nivel_2',      count(*) FILTER (WHERE estado = 'Escalado nivel 2'),\n  'pendientes_asignacion',  count(*) FILTER (WHERE estado = 'Pendiente de asignación'),\n  'agendados',              count(*) FILTER (WHERE estado IN ('Agendado', 'En atención')),\n  'resueltos_ia',           count(*) FILTER (WHERE estado = 'Resuelto IA'),\n  'cerrados',               count(*) FILTER (WHERE estado = 'Cerrado'),\n  'cancelados',             count(*) FILTER (WHERE estado = 'Cancelado'),\n  'tasa_resolucion_ia_pct', round(100.0 * count(*) FILTER (WHERE estado = 'Resuelto IA')\n                                  / NULLIF(count(*) FILTER (WHERE estado IN ('Resuelto IA', 'Cerrado')), 0), 1),\n  'tiempo_promedio_resolucion_horas',\n      round((avg(EXTRACT(EPOCH FROM (fecha_cierre - fecha_creacion::timestamptz)) / 3600)\n             FILTER (WHERE fecha_cierre IS NOT NULL))::numeric, 1),\n  'por_canal', COALESCE((SELECT jsonb_object_agg(canal_origen, n)\n                           FROM (SELECT canal_origen, count(*) AS n FROM f GROUP BY 1) x), '{}'::jsonb),\n  'actualizado_en', now()\n) AS metricas\nFROM f;",
+        "options": {
+          "queryReplacement": "={{ [$json.desde, $json.hasta] }}"
+        }
+      },
+      "name": "Consultar métricas del dashboard",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1460,
+        2060
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "bde16020-7665-5a11-8b16-b7b2d9c6e3d0"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, status: 'ok', data: $json.metricas } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder métricas",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1700,
+        2060
+      ],
+      "id": "a8d83d4f-1a99-5047-b351-607190f3fbb6"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT jsonb_build_object(\n  'tickets', COALESCE((\n     SELECT jsonb_agg(x ORDER BY x.fecha_creacion DESC) FROM (\n       SELECT t.id AS ticket_id, t.nombre_completo, t.correo, t.telefono, t.direccion, t.tipo_dispositivo,\n              left(t.descripcion_problema, 200) AS descripcion, t.estado, t.categoria, t.nivel_impacto,\n              t.fecha_creacion, t.fecha_visita, t.fecha_cierre, t.canal_origen, t.url_acta,\n              te.nombre AS tecnico_nombre\n         FROM public.tickets_soporte t\n         LEFT JOIN public.tecnicos te ON te.id = t.tecnico_asignado_id\n        WHERE ($1 = '' OR t.estado = $1)\n        ORDER BY t.fecha_creacion DESC\n        LIMIT 100) x), '[]'::jsonb),\n  'tecnicos', COALESCE((\n     SELECT jsonb_agg(jsonb_build_object('tecnico_id', te.id, 'nombre', te.nombre, 'cuadrante', te.cuadrante)\n                      ORDER BY te.cuadrante, te.nombre)\n       FROM public.tecnicos te WHERE te.activo), '[]'::jsonb)\n) AS data;",
+        "options": {
+          "queryReplacement": "={{ [$json.estado] }}"
+        }
+      },
+      "name": "Consultar tickets y técnicos (admin)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1460,
+        2240
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "d892c6d7-8fe4-53b5-b5e8-fd459ad2abb0"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH t0 AS (\n  SELECT t.id, t.estado FROM public.tickets_soporte t\n   WHERE t.id = $1 AND t.estado IN ('Pendiente de asignación', 'Escalado nivel 2', 'Escalamiento pendiente')\n   FOR UPDATE\n), te AS (\n  SELECT id, nombre, correo, cuadrante FROM public.tecnicos WHERE id = $2 AND activo\n), cita AS (\n  INSERT INTO public.citas (ticket_id, tecnico_id, fecha_inicio, duracion_min, cuadrante, estado)\n  SELECT t0.id, te.id, $3::timestamptz, 60, te.cuadrante, 'Agendada' FROM t0, te\n   WHERE $3::timestamptz > now()\n     AND NOT EXISTS (SELECT 1 FROM public.citas c\n                      WHERE c.tecnico_id = te.id AND c.estado = 'Agendada'\n                        AND c.fecha_inicio < $3::timestamptz + interval '60 minutes'\n                        AND c.fecha_inicio + make_interval(mins => c.duracion_min) > $3::timestamptz)\n  ON CONFLICT DO NOTHING\n  RETURNING id, ticket_id, tecnico_id, fecha_inicio, cuadrante\n), upd AS (\n  UPDATE public.tickets_soporte t\n     SET tecnico_asignado_id = c.tecnico_id, fecha_visita = c.fecha_inicio, estado = 'Agendado'\n    FROM cita c WHERE t.id = c.ticket_id\n  RETURNING t.id AS ticket_id, t.nombre_completo, t.correo, t.direccion, t.telefono, t.descripcion_problema,\n            t.estado, t.fecha_visita, c.id AS cita_id, c.cuadrante\n), audit AS (\n  INSERT INTO public.auditoria_tickets (ticket_id, actor, accion, estado_anterior, estado_nuevo, detalle)\n  SELECT u.ticket_id, 'admin:' || $4, 'asignacion_manual', t0.estado, 'Agendado',\n         jsonb_build_object('tecnico_id', $2, 'fecha_visita', u.fecha_visita)\n    FROM upd u JOIN t0 ON t0.id = u.ticket_id\n)\nSELECT upd.*, te.nombre AS tecnico_nombre, te.correo AS tecnico_correo\n  FROM (SELECT 1) seed LEFT JOIN upd ON true LEFT JOIN te ON upd.ticket_id IS NOT NULL;",
+        "options": {
+          "queryReplacement": "={{ [$json.ticket_id, $json.tecnico_id, $json.fecha_inicio, $json.auth_usuario_id] }}"
+        }
+      },
+      "name": "Asignar técnico manualmente",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1460,
+        2420
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "9Gs2DA8EZ8914KDZ",
+          "name": "Postgres account"
+        }
+      },
+      "id": "138dff4d-fc48-57dd-8734-8405bc0068b6"
+    },
+    {
+      "parameters": {
+        "jsCode": "const x = $input.first().json;\nif (!x.ticket_id) {\n  return [{ json: { enviar: false, respuesta: { success: false, status: 'assignment_rejected',\n    message: 'No se pudo asignar: revisa que el ticket esté pendiente, que la fecha sea futura y que el técnico no tenga otra cita a esa hora.' } } }];\n}\nconst fecha_local = new Date(x.fecha_visita).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'full', timeStyle: 'short' });\nreturn [{ json: { ...x, fecha_local, enviar: true, respuesta: { success: true, status: 'appointment_scheduled',\n  ticket_id: x.ticket_id, fecha_visita: x.fecha_visita, tecnico_nombre: x.tecnico_nombre,\n  message: `Visita asignada a ${x.tecnico_nombre} para el ${fecha_local} (hora Colombia)` } } }];\n"
+      },
+      "name": "Preparar confirmación de asignación",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        2420
+      ],
+      "id": "0880dd11-1f4b-5b44-bf9c-44b673b73ac9"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6bb6450a-f56b-5ee9-ba8d-35fb50c856e3",
+              "leftValue": "={{ $json.enviar === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "¿Se asignó?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2180,
+        2420
+      ],
+      "id": "7fa1bafd-8904-53eb-be67-1245e5d4e1e6"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.correo }}",
+        "subject": "=Visita técnica agendada — Ticket #{{ $json.ticket_id }}",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Arial,sans-serif;font-size:14px;color:#172b4d\">Hola {{ $json.nombre_completo }},<br><br>Agendamos la visita técnica de tu ticket <b>#{{ $json.ticket_id }}</b>.<br><b>Fecha:</b> {{ $json.fecha_local }} (hora Colombia)<br><b>Técnico:</b> {{ $json.tecnico_nombre }}<br><b>Dirección:</b> {{ $json.direccion }}<br><br>Equipo de Soporte Técnico</div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Notificar visita al cliente (manual)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2420,
+        2340
+      ],
+      "webhookId": "edde71e6-163a-5d71-b036-b7b29dbc5093",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "RRhqAKrSTV5WDEoW",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "17bde34f-8a6e-591a-8ed1-d4d274b3b864"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.tecnico_correo }}",
+        "subject": "=Nueva visita asignada — Ticket #{{ $json.ticket_id }}",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Arial,sans-serif;font-size:14px;color:#172b4d\">Se te asignó una visita.<br><b>Ticket:</b> #{{ $json.ticket_id }}<br><b>Fecha:</b> {{ $json.fecha_local }}<br><b>Cliente:</b> {{ $json.nombre_completo }} — {{ $json.telefono }}<br><b>Dirección:</b> {{ $json.direccion }}<br><b>Problema:</b> {{ $json.descripcion_problema }}<br><br>Equipo de Soporte Técnico</div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Notificar visita al técnico (manual)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2420,
+        2520
+      ],
+      "webhookId": "d49ed936-0907-574e-a49e-f7eec72498f3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "RRhqAKrSTV5WDEoW",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "3affd527-d99b-5e30-9061-b2b11c1f7083"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.respuesta }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder asignación",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1940,
+        2420
+      ],
+      "id": "03a3fb30-ee88-5758-b8a4-23062b154eca"
+    }
+  ],
+  "connections": {
+    "Webhook portal": {
+      "main": [
+        [
+          {
+            "node": "Validar acción de portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar acción de portal": {
+      "main": [
+        [
+          {
+            "node": "Enrutar acción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrutar acción": {
+      "main": [
+        [
+          {
+            "node": "Responder petición inválida",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Crear cuenta cliente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validar credenciales y crear sesión",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generar token de recuperación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aplicar nueva contraseña",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validar sesión y obtener rol",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear cuenta cliente": {
+      "main": [
+        [
+          {
+            "node": "Responder registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar credenciales y crear sesión": {
+      "main": [
+        [
+          {
+            "node": "Responder login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar token de recuperación": {
+      "main": [
+        [
+          {
+            "node": "¿Hay cuenta para recuperar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay cuenta para recuperar?": {
+      "main": [
+        [
+          {
+            "node": "Enviar correo de recuperación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder recuperación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar correo de recuperación": {
+      "main": [
+        [
+          {
+            "node": "Responder recuperación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aplicar nueva contraseña": {
+      "main": [
+        [
+          {
+            "node": "Responder restablecimiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar sesión y obtener rol": {
+      "main": [
+        [
+          {
+            "node": "Autorizar acción según rol",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Autorizar acción según rol": {
+      "main": [
+        [
+          {
+            "node": "Enrutar acción autorizada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrutar acción autorizada": {
+      "main": [
+        [
+          {
+            "node": "Responder acceso denegado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder datos de sesión",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cerrar sesión",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consultar mis tickets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consultar detalle e historial del ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consultar cola del técnico",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cerrar ticket con evidencia PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consultar métricas del dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consultar tickets y técnicos (admin)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Asignar técnico manualmente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cerrar sesión": {
+      "main": [
+        [
+          {
+            "node": "Responder cierre de sesión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar mis tickets": {
+      "main": [
+        [
+          {
+            "node": "Responder lista",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar detalle e historial del ticket": {
+      "main": [
+        [
+          {
+            "node": "Responder detalle del ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar cola del técnico": {
+      "main": [
+        [
+          {
+            "node": "Responder lista",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cerrar ticket con evidencia PDF": {
+      "main": [
+        [
+          {
+            "node": "Responder cierre técnico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder cierre técnico": {
+      "main": [
+        [
+          {
+            "node": "¿Se cerró el ticket?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Se cerró el ticket?": {
+      "main": [
+        [
+          {
+            "node": "Notificar cierre al cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar métricas del dashboard": {
+      "main": [
+        [
+          {
+            "node": "Responder métricas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar tickets y técnicos (admin)": {
+      "main": [
+        [
+          {
+            "node": "Responder lista",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Asignar técnico manualmente": {
+      "main": [
+        [
+          {
+            "node": "Preparar confirmación de asignación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar confirmación de asignación": {
+      "main": [
+        [
+          {
+            "node": "Responder asignación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder asignación": {
+      "main": [
+        [
+          {
+            "node": "¿Se asignó?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Se asignó?": {
+      "main": [
+        [
+          {
+            "node": "Notificar visita al cliente (manual)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notificar visita al técnico (manual)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "id": "stPortal04v2xYz1",
+  "tags": []
+}
