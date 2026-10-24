@@ -1,0 +1,17 @@
+{
+  "name": "plataforma-soporte-tecnico",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Página de la plataforma de soporte técnico conectada a n8n",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "multer": "^2.0.2"
+  }
+}
