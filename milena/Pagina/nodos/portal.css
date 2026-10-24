@@ -1,0 +1,168 @@
+/* ==========================================================================
+   Estilos compartidos agregados para el portal (se cargan después del CSS de
+   cada ventana y reutilizan sus variables de color).
+   ========================================================================== */
+
+/* Botón "Salir" junto al usuario */
+.btn-logout {
+    margin-left: 10px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-color, #d9e2ec);
+    border-radius: 8px;
+    background: #ffffff;
+    color: #334e68;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+.btn-logout:hover { color: var(--accent-color, #2563c7); border-color: var(--accent-color, #2563c7); }
+
+/* Avisos */
+.aviso {
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+.aviso-error { background: #fdecec; color: #8a1f1f; border: 1px solid #f5c2c2; }
+.aviso-ok    { background: #e8f6ee; color: #1d5e3a; border: 1px solid #b9e3c9; }
+.aviso-info  { background: #eaf2fd; color: #1d4fa3; border: 1px solid #c4d8f6; }
+
+/* Estados de ticket */
+.badge-estado {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.estado-activo { background: #eaf2fd; color: #1d4fa3; }
+.estado-alerta { background: #fff4e0; color: #8a5300; }
+.estado-agenda { background: #efe9fd; color: #5b2bb5; }
+.estado-final  { background: #e8f6ee; color: #1d5e3a; }
+
+/* Paneles y tablas */
+.panel {
+    padding: 20px;
+    background: #ffffff;
+    border: 1px solid var(--border-color, #d9e2ec);
+    border-radius: 14px;
+    box-shadow: 0 4px 14px rgba(16, 42, 67, 0.05);
+}
+.panel + .panel { margin-top: 18px; }
+.panel h2, .panel h3 { margin: 0 0 12px; font-size: 17px; color: var(--text-color, #172b4d); }
+
+.barra-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.barra-filtros label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted, #61738a); }
+
+.campo {
+    padding: 9px 10px;
+    border: 1px solid var(--border-color, #d9e2ec);
+    border-radius: 8px;
+    background: var(--field-bg, #f8fafc);
+    color: var(--text-color, #172b4d);
+    font: inherit;
+    font-size: 14px;
+}
+textarea.campo { width: 100%; resize: vertical; }
+
+.btn {
+    padding: 9px 16px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: var(--accent-color, #2563c7);
+    color: #ffffff;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn:hover { background: var(--accent-hover, #1d4fa3); }
+.btn:disabled { opacity: 0.6; cursor: wait; }
+.btn-secundario { background: #ffffff; color: #334e68; border-color: var(--border-color, #d9e2ec); }
+.btn-secundario:hover { background: #f2f7fd; }
+
+.tabla-wrap { overflow-x: auto; }
+.tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+.tabla th, .tabla td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #edf1f5;
+    text-align: left;
+    vertical-align: top;
+}
+.tabla th { color: var(--text-muted, #61738a); font-size: 12px; font-weight: 600; text-transform: uppercase; }
+.tabla tbody tr { cursor: pointer; }
+.tabla tbody tr:hover { background: #f7f9fc; }
+.tabla tbody tr.seleccionado { background: #eef4fd; }
+.tabla .vacio { padding: 24px; text-align: center; color: var(--text-muted, #61738a); cursor: default; }
+.texto-corto { max-width: 340px; color: #3e526a; }
+
+/* Dos columnas: lista + detalle */
+.dos-columnas {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .dos-columnas { grid-template-columns: 1fr; }
+}
+
+.detalle-lista { display: grid; grid-template-columns: 120px 1fr; gap: 6px 10px; margin: 0 0 14px; font-size: 14px; }
+.detalle-lista dt { color: var(--text-muted, #61738a); }
+.detalle-lista dd { margin: 0; overflow-wrap: anywhere; }
+
+.historial { max-height: 320px; overflow-y: auto; margin: 0 0 14px; padding: 0; list-style: none; }
+.historial li { margin-bottom: 8px; padding: 8px 10px; border-radius: 8px; background: #f7f9fc; font-size: 13px; line-height: 1.45; }
+.historial li.emisor-usuario { background: #eaf2fd; }
+.historial li.emisor-sistema { background: #fff4e0; }
+.historial .quien { display: block; margin-bottom: 2px; font-size: 11px; font-weight: 700; color: var(--text-muted, #61738a); text-transform: uppercase; }
+
+.formulario-columna { display: flex; flex-direction: column; gap: 10px; }
+.formulario-columna label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+
+/* Tarjetas de métricas extra del dashboard */
+.stats-container.metricas { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+
+/* Cabecera del chat con el número de ticket */
+.chat-ticket-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: var(--text-muted, #61738a);
+}
+.chat-ticket-info strong { color: var(--text-color, #172b4d); }
+.chat-ticket-info .enlace-tecnico { margin-left: auto; color: var(--accent-color, #2563c7); font-size: 13px; cursor: pointer; background: none; border: none; font: inherit; }
+
+/* El indicador del menú siempre flota sobre los enlaces (algunas ventanas no lo definían) */
+.nav-menu { position: relative; }
+.nav-indicator { position: absolute; top: 0; left: 0; height: 100%; pointer-events: none; }
+
+/* Respeta el atributo hidden aunque la clase defina display */
+[hidden] { display: none !important; }
+
+/* Menú en pantallas pequeñas: el menú pasa a su propia fila y se desplaza horizontalmente */
+@media (max-width: 760px) {
+    body { padding: 8px; }
+    .main-layout { border-radius: 20px; }
+    .sidebar { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+    .sidebar-footer { order: 1; width: 100%; justify-content: space-between; margin-left: 0; }
+    .sidebar-top { order: 2; width: 100%; overflow-x: auto; justify-content: flex-start; }
+    .nav-menu { margin: 0; }
+    .content { padding: 18px 14px; }
+    .welcome-banner { padding: 22px; }
+}
